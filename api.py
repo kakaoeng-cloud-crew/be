@@ -1,20 +1,12 @@
-from fastapi import FastAPI, File, UploadFile, HTTPException
-from pydantic import BaseModel
+from fastapi import FastAPI, HTTPException
 from typing import List
 import boto3
-import datetime
 import db_utils as db
-import aws_utils as aws
-
-# 프로젝트 생성을 위한 클래스
-class Project(BaseModel):
-    project_name: str
-    template: bytes
-    values: bytes
+from project import ProjectConfig, Project
 
 client = db.connect_to_db()
 collection = db.get_collection(client, "cloudcrew", "Projects")
-s3 = aws.get_s3_client()
+s3 = boto3.client('s3')
 
 app = FastAPI()
 
@@ -29,14 +21,11 @@ async def get_projects():
 
 # [POST] 프로젝트 생성
 @app.post("/api/v1/projects")
-async def new_project(project: Project):
+async def new_project(project: Project):  # 수정된 부분
     try:
-        if len(project.project_name) < 4 or len(project.project_name) > 20:
-            raise HTTPException(status_code=400, detail="[ERROR] newProject() input error")
-
         # 파일을 S3에 업로드
-        s3.upload_fileobj(project.template, "your_bucket_name", f"{project.project_name}_template")
-        s3.upload_fileobj(project.values, "your_bucket_name", f"{project.project_name}_values")
+        s3.upload_fileobj(project.template.file, "your_bucket_name", f"{project.project_name}_template")
+        s3.upload_fileobj(project.values.file, "your_bucket_name", f"{project.project_name}_values")
 
         # MongoDB에 프로젝트 정보 저장
         result = collection.insert_one({
