@@ -47,9 +47,9 @@ async def new_project(
         # create documents and save project _id property
         data = {
             "project_name": project_name,
-            "template_url": "",
-            "values_url": "",
-            "end_point": "",
+            "template_url": "NULL",
+            "values_url": "NULL",
+            "end_point": "No data endPoint",
             "day": current_time
         }
         result = collection.insert_one(data)
@@ -92,7 +92,7 @@ async def get_project(project_id: str):
             # 프로젝트 정보를 dict로 변환하고, _id를 문자열로 변환
             project_data = {
                 "project_name": project["project_name"],
-                "end_point": project.get("end_point", ""), # end_point가 없는 경우 빈 문자열 반환
+                "end_point": project.get("end_point", "NULL"), # end_point가 없는 경우 빈 문자열 반환
                 "day": project["day"],
                 "meta_data": "Metadata not available"
             }

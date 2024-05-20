@@ -1,5 +1,5 @@
 # 베이스 이미지를 파이썬 3.8로 설정
-FROM python:3.8-slim
+FROM python:3.10.12-slim
 
 # 작업 디렉터리 설정
 WORKDIR /app
