@@ -1,0 +1,6 @@
+.dockerignore
+.git
+__pycache__
+Dockerfile
+README.md
+k8s
