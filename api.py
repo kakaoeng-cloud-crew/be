@@ -3,7 +3,7 @@ from fastapi.responses import JSONResponse
 from fastapi.middleware.cors import CORSMiddleware
 from typing import List
 import boto3
-from botocore.exceptions import NoCredentialsError
+from botocore.exceptions import NoCredentialsError, PartialCredentialsError, BotoCoreError
 import db_utils as db
 from bson import ObjectId
 from datetime import datetime
@@ -18,7 +18,7 @@ app = FastAPI()
 # CORS 미들웨어 설정
 app.add_middleware(
     CORSMiddleware,
-    allow_origins=["http://localhost:5173"],  # 필요한 출처 추가
+    allow_origins=["http://localhost:5173"],  # 리액트(5173)에서 보내는 요청 허용
     allow_credentials=True,
     allow_methods=["*"],  # 모든 HTTP 메소드 허용
     allow_headers=["*"],  # 모든 HTTP 헤더 허용
@@ -41,10 +41,10 @@ async def new_project(
     values: UploadFile = File(...)
 ):
     try:
-        # Save the current time
+        # create current datetime
         current_time = datetime.now().strftime("%Y:%m:%d:%H:%M:%S")
         
-        # Save the project information to MongoDB and get the _id
+        # create documents and save project _id property
         data = {
             "project_name": project_name,
             "template_url": "",
@@ -75,15 +75,47 @@ async def new_project(
     
     except NoCredentialsError:
         raise HTTPException(status_code=403, detail="AWS credentials not available")
+    except PartialCredentialsError:
+        raise HTTPException(status_code=403, detail="Incomplete AWS credentials")
+    except BotoCoreError as e:
+        raise HTTPException(status_code=500, detail=f"AWS error: {str(e)}")
     except Exception as e:
         raise HTTPException(status_code=500, detail=str(e))
 
 # [GET] 단일 프로젝트 조회
-@app.get("/api/v1/projects/{project_id}")
+@app.get("/api/v1/projects/{project_id}", response_model=dict)
 async def get_project(project_id: str):
-    print("GET API")
+    try:
+        # ObjectId로 변환하여 MongoDB에서 프로젝트 찾기
+        project = collection.find_one({"_id": ObjectId(project_id)})
+        if project:
+            # 프로젝트 정보를 dict로 변환하고, _id를 문자열로 변환
+            project_data = {
+                "project_name": project["project_name"],
+                "end_point": project.get("end_point", ""), # end_point가 없는 경우 빈 문자열 반환
+                "day": project["day"],
+                "meta_data": "Metadata not available"
+            }
+            return project_data
+        else:
+            # 프로젝트가 없는 경우 404 에러 반환
+            raise HTTPException(status_code=404, detail="Project not found")
+    except Exception as e:
+        # 예외 처리
+        raise HTTPException(status_code=500, detail=str(e))
 
 # [DELETE] 프로젝트 삭제
-@app.delete("/api/v1/projects/{project_id}")
+@app.delete("/api/v1/projects/{project_id}", response_model=dict)
 async def delete_project(project_id: str):
-    print("DELETE API")
+    try:
+        # ObjectId로 변환하여 MongoDB에서 프로젝트 삭제
+        result = collection.delete_one({"_id": ObjectId(project_id)})
+        if result.deleted_count:
+            # 프로젝트가 성공적으로 삭제된 경우
+            return {"message": "Project successfully deleted"}
+        else:
+            # 프로젝트가 없는 경우 404 에러 반환
+            raise HTTPException(status_code=404, detail="Project not found")
+    except Exception as e:
+        # 예외 처리
+        raise HTTPException(status_code=500, detail=str(e))

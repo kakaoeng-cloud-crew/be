@@ -5,11 +5,14 @@ def connect_to_db():
     user = getenv("DB_USER")
     pwd = getenv("DB_PWD")
     host = getenv("DB_HOST")
-    port = 27017
+    port = int(getenv("DB_PORT", 27017))
+    
+    if not all([user, pwd, host]):
+        raise EnvironmentError("DB_USER, DB_PWD, and DB_HOST environment variables must be set")
     
     client = MongoClient(
         host=host,
-        port=27017,
+        port=port,
         username=user,
         password=pwd
     )
