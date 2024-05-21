@@ -7,9 +7,10 @@ from botocore.exceptions import NoCredentialsError, PartialCredentialsError, Bot
 import db_utils as db
 from bson import ObjectId
 from datetime import datetime
+from os import getenv
 
 client = db.connect_to_db()
-collection = db.get_collection(client, "cloudcrew", "Projects")
+collection = db.get_collection(client, getenv("DB_NAME"), getenv("COL_NAME"))
 s3 = boto3.client('s3')
 bucket_name = "cc-helm-templates"
 
@@ -18,8 +19,8 @@ app = FastAPI()
 # CORS 미들웨어 설정
 app.add_middleware(
     CORSMiddleware,
-    # allow_origins=["http://localhost:5174"],  # 리액트에서 보내는 요청 허용
-    allow_origins=["https://www.cloudcrew.site"],
+    allow_origins=["http://localhost:5174"],  # 리액트에서 보내는 요청 허용
+    #allow_origins=["https://www.cloudcrew.site"],
     allow_credentials=True,
     allow_methods=["*"],  # 모든 HTTP 메소드 허용
     allow_headers=["*"],  # 모든 HTTP 헤더 허용

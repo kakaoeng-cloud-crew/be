@@ -1,0 +1,9 @@
+apiVersion: v1
+kind: ConfigMap
+metadata:
+  name: db-config
+data:
+  DB_HOST: "internal-ip"  # 인스턴스 생성 후 내부 IP 지정
+  DB_PORT: "27017"        # 몽고 DB의 포트 번호
+  DB_NAME: "cloudcrew"    # 몽고 DB에 생성된 데이터베이스 이름
+  COL_NAME: "Projects"    # 데이터베이스에 존재하는 컬렉션의 이름
