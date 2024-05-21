@@ -121,3 +121,7 @@ async def delete_project(project_id: str):
     except Exception as e:
         # 예외 처리
         raise HTTPException(status_code=500, detail=str(e))
+
+if __name__ == "__main__":
+    import uvicorn
+    uvicorn.run(app, host="0.0.0.0", port=8000)
