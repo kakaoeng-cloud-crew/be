@@ -30,7 +30,7 @@ app.add_middleware(
 @app.get("/api/v1/projects", response_model=List[str])
 async def get_projects():
     try:
-        projects = collection.find()
+        projects = collection.find().sort("day", -1)
         return [str(project['_id']) for project in projects]
     except Exception as e:
         raise HTTPException(status_code=500, detail=str(e))
