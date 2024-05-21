@@ -26,7 +26,7 @@ app.add_middleware(
     allow_headers=["*"],  # 모든 HTTP 헤더 허용
 )
 
-# [GET] Retrieve the entire list of projects
+# [GET] 프로젝트 목록 전체 조회
 @app.get("/api/v1/projects", response_model=List[str])
 async def get_projects():
     try:
@@ -35,7 +35,7 @@ async def get_projects():
     except Exception as e:
         raise HTTPException(status_code=500, detail=str(e))
 
-# [POST] Create a new project
+# [POST] SB 프로젝트 생성
 @app.post("/api/v1/projects")
 async def new_project(
     project_name: str = Form(...),
@@ -72,6 +72,8 @@ async def new_project(
             {"_id": ObjectId(project_id)},
             {"$set": {"template_url": template_url, "values_url": values_url}}
         )
+        
+        # 이곳에 EKS에 namespace를 생성하고 helm install 하는 기능 추가하는 프로세스 삽입
         
         return JSONResponse(content={"project_id": project_id}, status_code=201)
     
@@ -110,6 +112,10 @@ async def get_project(project_id: str):
 @app.delete("/api/v1/projects/{project_id}", response_model=dict)
 async def delete_project(project_id: str):
     try:
+        # EKS helm delete 추가
+        
+        # EKS namespace delete 추가
+        
         # ObjectId로 변환하여 MongoDB에서 프로젝트 삭제
         result = collection.delete_one({"_id": ObjectId(project_id)})
         if result.deleted_count:
