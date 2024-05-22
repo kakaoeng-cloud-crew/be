@@ -3,16 +3,18 @@ kind: Deployment
 metadata:
   name: back-end
 spec:
+  replicas: 3
   selector:
     matchLabels:
       app: back-end
   template:
     metadata:
+      name: back-end-pod
       labels:
         app: back-end
     spec:
       containers:
-      - name: myapp
+      - name: fastapi-server
         image: 165304734991.dkr.ecr.ap-northeast-1.amazonaws.com/cloudcrew-be:test01
         resources:
           requests:
@@ -22,7 +24,7 @@ spec:
             memory: "512Mi"
             cpu: "500m"
         ports:
-        - containerPort: 80
+        - containerPort: 8000
         env:
         - name: DB_USER
           valueFrom:
