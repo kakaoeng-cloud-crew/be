@@ -9,13 +9,12 @@ spec:
       app: back-end
   template:
     metadata:
-      name: back-end-pod
       labels:
         app: back-end
     spec:
       containers:
       - name: fastapi-server
-        image: 165304734991.dkr.ecr.ap-northeast-1.amazonaws.com/cloudcrew-be:test01
+        image: 165304734991.dkr.ecr.ap-northeast-1.amazonaws.com/cloudcrew-be:test02
         resources:
           requests:
             memory: "256Mi"
@@ -24,7 +23,7 @@ spec:
             memory: "512Mi"
             cpu: "500m"
         ports:
-          - containerPort: 8000
+          - containerPort: 80
         env:
         - name: DB_USER
           valueFrom:

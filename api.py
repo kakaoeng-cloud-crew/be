@@ -19,8 +19,12 @@ app = FastAPI()
 # CORS 미들웨어 설정
 app.add_middleware(
     CORSMiddleware,
-    allow_origins=["http://localhost:5174"],  # 리액트에서 보내는 요청 허용
-    #allow_origins=["https://www.cloudcrew.site"],
+    allow_origins=[
+        "http://localhost:5174", # local 리액트 요청
+        "http://cloudcrew.site", # EKS 배포 환경 HTTP
+        "https://cloudcrew.site", # 만약 HTTPS 인증 구성을 했을 경우
+        "https://www.cloudcrew.site" # 만약 www 서브 도메인을 구성했다면
+    ],
     allow_credentials=True,
     allow_methods=["*"],  # 모든 HTTP 메소드 허용
     allow_headers=["*"],  # 모든 HTTP 헤더 허용
@@ -130,4 +134,4 @@ async def delete_project(project_id: str):
 
 if __name__ == "__main__":
     import uvicorn
-    uvicorn.run(app, host="0.0.0.0", port=8000)
+    uvicorn.run(app, host="0.0.0.0", port=80)
