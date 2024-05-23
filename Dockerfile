@@ -10,6 +10,16 @@ COPY requirements.txt .
 # 파이썬 의존성 설치
 RUN pip install --no-cache-dir -r requirements.txt
 
+# kubectl 설치
+RUN apt-get update && \
+    apt-get install -y curl && \
+    curl -LO "https://storage.googleapis.com/kubernetes-release/release/$(curl -s https://storage.googleapis.com/kubernetes-release/release/stable.txt)/bin/linux/amd64/kubectl" && \
+    chmod +x ./kubectl && \
+    mv ./kubectl /usr/local/bin/kubectl
+
+# helm 설치
+RUN curl https://raw.githubusercontent.com/helm/helm/main/scripts/get-helm-3 | bash
+
 # 현재 디렉터리의 모든 파일을 컨테이너의 작업 디렉터리로 복사
 COPY . .
 
