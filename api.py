@@ -8,7 +8,8 @@ import db_utils as db
 from bson import ObjectId
 from datetime import datetime
 from os import getenv
-import subprocess
+from kubernetes import client, config
+import ssl
 
 client = db.connect_to_db()
 collection = db.get_collection(client, getenv("DB_NAME"), getenv("COL_NAME"))
@@ -86,8 +87,7 @@ async def new_project(
         )
         
         # 이곳에 EKS에 namespace를 생성하고 helm install 하는 기능 추가하는 프로세스 삽입
-        # EKS에 namespace 생성
-        subprocess.run(["kubectl", "create", "namespace", project_name], check=True)
+        
         
         return JSONResponse(content={"project_id": project_id}, status_code=201)
     
