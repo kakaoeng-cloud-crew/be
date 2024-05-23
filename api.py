@@ -13,22 +13,30 @@ client = db.connect_to_db()
 collection = db.get_collection(client, getenv("DB_NAME"), getenv("COL_NAME"))
 s3 = boto3.client('s3')
 bucket_name = "cc-helm-templates"
+print(getenv("DB_HOST"))
 
 app = FastAPI()
 
 # CORS 미들웨어 설정
 app.add_middleware(
     CORSMiddleware,
+    # 허용하는 접속 도메인 작성
     allow_origins=[
-        "http://localhost:5174", # local 리액트 요청
-        "http://cloudcrew.site", # EKS 배포 환경 HTTP
-        "https://cloudcrew.site", # 만약 HTTPS 인증 구성을 했을 경우
-        "https://www.cloudcrew.site" # 만약 www 서브 도메인을 구성했다면
+        "http://localhost:5173",
+        "http://cloudcrew.site",
+        "https://cloudcrew.site",
+        "http://www.cloudcrew.site",
+        "https://www.cloudcrew.site",
     ],
     allow_credentials=True,
     allow_methods=["*"],  # 모든 HTTP 메소드 허용
     allow_headers=["*"],  # 모든 HTTP 헤더 허용
 )
+
+# api 주소 시작 페이지 API 구성 (디버깅용)
+@app.get("/api")
+async def root():
+    return {"message": "Welcome to the API"}
 
 # [GET] 프로젝트 목록 전체 조회
 @app.get("/api/v1/projects", response_model=List[str])
