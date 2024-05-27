@@ -151,7 +151,7 @@ async def get_project(project_id: str):
         # 예외 처리
         raise HTTPException(status_code=500, detail=str(e))
 
-@app.delete("/api/v1/projects/{project_id}", response_model=ResponseModel)
+@app.delete("/api/v1/projects/{project_id}")
 async def delete_project(project_id: str):
     project = collection.find_one({"_id": ObjectId(project_id)})
     if not project:
