@@ -86,9 +86,9 @@ async def new_project(
         s3.upload_fileobj(values.file, bucket_name, values_key)
         
         # 저장 위치 URL 추출 후 DB 업데이트
-        template_url = f"https://{bucket_name}.s3.amazonaws.com/{template_key}"
-        values_url = f"https://{bucket_name}.s3.amazonaws.com/{values_key}"
-        
+        template_url = f"s3://{bucket_name}/{template_key}"
+        values_url = f"s3://{bucket_name}/{values_key}"
+
         # Update the S3 URLs in MongoDB
         collection.update_one(
             {"_id": ObjectId(project_id)},
