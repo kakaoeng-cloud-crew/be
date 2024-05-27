@@ -8,13 +8,21 @@ import db_utils as db
 from bson import ObjectId
 from datetime import datetime
 from os import getenv
-from kubernetes import client, config
-import ssl
+import requests
+from requests.auth import HTTPBasicAuth
+import pytz
 
 client = db.connect_to_db()
 collection = db.get_collection(client, getenv("DB_NAME"), getenv("COL_NAME"))
 s3 = boto3.client('s3')
 bucket_name = "cc-helm-templates"
+tz = pytz.timezone('Asia/Seoul') # 모든 리눅스의 기본 time은 미국 혹은 영국 시간
+
+# 젠킨스 서버 데이터 => Configmap, Secret 예정
+jenkins_url = "http://10.0.1.85:8080/job/CloudCrew-JOB/buildWithParameters"
+jenkins_token = "1151c1c51cd9cdb1d5d8fc1213e1325c3e"
+jenkins_user = "admin"
+header = {'Content-Type': 'application/x-www-form-urlencoded'}
 
 app = FastAPI()
 
@@ -23,7 +31,6 @@ app.add_middleware(
     CORSMiddleware,
     # 허용하는 접속 도메인 작성
     allow_origins=[
-        "http://localhost:5173",
         "http://cloudcrew.site",
         "https://cloudcrew.site",
         "http://www.cloudcrew.site",
@@ -43,6 +50,7 @@ async def root():
 @app.get("/api/v1/projects", response_model=List[str])
 async def get_projects():
     try:
+        # 생성 날짜를 내림차순 기준으로 리턴
         projects = collection.find().sort("day", -1)
         return [str(project['_id']) for project in projects]
     except Exception as e:
@@ -56,10 +64,10 @@ async def new_project(
     values: UploadFile = File(...)
 ):
     try:
-        # create current datetime
-        current_time = datetime.now().strftime("%Y:%m:%d:%H:%M:%S")
+        # 생성 날짜 생성
+        current_time = datetime.now(tz).strftime("%Y:%m:%d:%H:%M:%S")
         
-        # create documents and save project _id property
+        # 기본 틀 작성 후 Collection에 Document 추가
         data = {
             "project_name": project_name,
             "template_url": "NULL",
@@ -68,15 +76,16 @@ async def new_project(
             "day": current_time
         }
         result = collection.insert_one(data)
-        project_id = str(result.inserted_id)
+        project_id = str(result.inserted_id) # 고유값으로 폴더 생성하기
         
-        # Upload files to S3
+        # Upload files to S3 : cc-helm-templates/projects/{고유 식별 id}/file 2개
         template_key = f"projects/{project_id}/{template.filename}"
         values_key = f"projects/{project_id}/{values.filename}"
         
         s3.upload_fileobj(template.file, bucket_name, template_key)
         s3.upload_fileobj(values.file, bucket_name, values_key)
         
+        # 저장 위치 URL 추출 후 DB 업데이트
         template_url = f"https://{bucket_name}.s3.amazonaws.com/{template_key}"
         values_url = f"https://{bucket_name}.s3.amazonaws.com/{values_key}"
         
@@ -86,9 +95,30 @@ async def new_project(
             {"$set": {"template_url": template_url, "values_url": values_url}}
         )
         
-        # 이곳에 EKS에 namespace를 생성하고 helm install 하는 기능 추가하는 프로세스 삽입
+        # 젠킨스 서버에 요청보내기 - 보낼 때 project_name과 id에 대한 값을 같이 보낼 예정
+        # 1. 넘겨줄 매개변수 틀 작성
+        parameters = {
+            'type': 'CREATE',
+            'project_name': project_name,
+            'project_id': project_id
+        }
         
+        # 2. 젠킨스 Job에 POST 요청 보내서 Job 실행하기
+        response = requests.post(
+            jenkins_url, 
+            data=parameters, 
+            headers=header, 
+            auth=HTTPBasicAuth(jenkins_user, jenkins_token)
+        )
         
+        # 3. 응답 확인
+        if response.status_code == 201:
+            print('Job triggered successfully. (create namesapce, helm install)')
+        else:
+            print(f'Failed to trigger job: {response.status_code}')
+            print(response.text)
+        
+        # POST 요청 성공 메세지 201 응답 전송
         return JSONResponse(content={"project_id": project_id}, status_code=201)
     
     except NoCredentialsError:
@@ -126,9 +156,28 @@ async def get_project(project_id: str):
 @app.delete("/api/v1/projects/{project_id}", response_model=dict)
 async def delete_project(project_id: str):
     try:
-        # EKS helm delete 추가
+        # 젠킨스 서버에 요청보내기 - 보낼 때 project_name과 id에 대한 값을 같이 보낼 예정  
+        # 1. 넘겨줄 매개변수 틀 작성
+        parameters = {
+            'type': 'DELETE',
+            'project_name': project_name,
+            'project_id': project_id
+        }
         
-        # EKS namespace delete 추가
+        # 2. 젠킨스 Job에 POST 요청 보내서 Job 실행하기
+        response = requests.post(
+            jenkins_url, 
+            data=parameters, 
+            headers=header, 
+            auth=HTTPBasicAuth(jenkins_user, jenkins_token)
+        )
+        
+        # 3. 응답 확인
+        if response.status_code == 201:
+            print('Job triggered successfully. (helm delete, delete namesapce, Update DB)')
+        else:
+            print(f'Failed to trigger job: {response.status_code}')
+            print(response.text)
         
         # ObjectId로 변환하여 MongoDB에서 프로젝트 삭제
         result = collection.delete_one({"_id": ObjectId(project_id)})
