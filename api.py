@@ -64,46 +64,38 @@ async def new_project(
     values: UploadFile = File(...)
 ):
     try:
-        # 생성 날짜 생성
         current_time = datetime.now(tz).strftime("%Y:%m:%d:%H:%M:%S")
         
-        # 기본 틀 작성 후 Collection에 Document 추가
         data = {
             "project_name": project_name,
             "template_url": "NULL",
             "values_url": "NULL",
-            "end_point": "No data endPoint",
+            "end_point": "NULL",
             "day": current_time
         }
         result = collection.insert_one(data)
-        project_id = str(result.inserted_id) # 고유값으로 폴더 생성하기
+        project_id = str(result.inserted_id)
         
-        # Upload files to S3 : cc-helm-templates/projects/{고유 식별 id}/file 2개
         template_key = f"projects/{project_id}/{template.filename}"
         values_key = f"projects/{project_id}/{values.filename}"
         
         s3.upload_fileobj(template.file, bucket_name, template_key)
         s3.upload_fileobj(values.file, bucket_name, values_key)
         
-        # 저장 위치 URL 추출 후 DB 업데이트
         template_url = f"s3://{bucket_name}/{template_key}"
         values_url = f"s3://{bucket_name}/{values_key}"
 
-        # Update the S3 URLs in MongoDB
         collection.update_one(
             {"_id": ObjectId(project_id)},
             {"$set": {"template_url": template_url, "values_url": values_url}}
         )
-        
-        # 젠킨스 서버에 요청보내기 - 보낼 때 project_name과 id에 대한 값을 같이 보낼 예정
-        # 1. 넘겨줄 매개변수 틀 작성
+
         parameters = {
             'type': 'CREATE',
             'project_name': project_name,
             'project_id': project_id
         }
         
-        # 2. 젠킨스 Job에 POST 요청 보내서 Job 실행하기
         response = requests.post(
             jenkins_url, 
             data=parameters, 
@@ -111,15 +103,22 @@ async def new_project(
             auth=HTTPBasicAuth(jenkins_user, jenkins_token)
         )
         
-        # 3. 응답 확인
         if response.status_code == 201:
-            print('Job triggered successfully. (create namesapce, helm install)')
+            print('Job triggered successfully.')
         else:
             print(f'Failed to trigger job: {response.status_code}')
             print(response.text)
+
+        # Jenkins 파이프라인의 응답 대기 및 확인 로직 추가
+        end_time = datetime.now() + timedelta(seconds=60)  # 타임아웃 설정
+        while datetime.now() < end_time:
+            doc = collection.find_one({"_id": ObjectId(project_id)})
+            if doc['end_point'] != "NULL":
+                return JSONResponse(content={"project_id": project_id}, status_code=201)
+            time.sleep(3)  # 3초 후 다시 확인
         
-        # POST 요청 성공 메세지 201 응답 전송
-        return JSONResponse(content={"project_id": project_id}, status_code=201)
+        # 1분이 지나도 end_point가 업데이트 되지 않으면 타임아웃 예외 처리
+        raise HTTPException(status_code=408, detail="Request Timeout: Jenkins job did not finish in time.")
     
     except NoCredentialsError:
         raise HTTPException(status_code=403, detail="AWS credentials not available")
