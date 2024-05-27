@@ -152,41 +152,43 @@ async def get_project(project_id: str):
         # 예외 처리
         raise HTTPException(status_code=500, detail=str(e))
 
-# [DELETE] 프로젝트 삭제
-@app.delete("/api/v1/projects/{project_id}", response_model=dict)
+@app.delete("/api/v1/projects/{project_id}", response_model=ResponseModel)
 async def delete_project(project_id: str):
-    try:
-        # 젠킨스 서버에 요청보내기 - 보낼 때 project_name과 id에 대한 값을 같이 보낼 예정  
-        # 1. 넘겨줄 매개변수 틀 작성
-        parameters = {
-            'type': 'DELETE',
-            'project_name': project_name,
-            'project_id': project_id
-        }
-        
-        # 2. 젠킨스 Job에 POST 요청 보내서 Job 실행하기
-        response = requests.post(
-            jenkins_url, 
-            data=parameters, 
-            headers=header, 
-            auth=HTTPBasicAuth(jenkins_user, jenkins_token)
-        )
-        
-        # 3. 응답 확인
-        if response.status_code == 201:
-            print('Job triggered successfully. (helm delete, delete namesapce, Update DB)')
-        else:
-            print(f'Failed to trigger job: {response.status_code}')
-            print(response.text)
-        
-        # ObjectId로 변환하여 MongoDB에서 프로젝트 삭제
-        result = collection.delete_one({"_id": ObjectId(project_id)})
-        if result.deleted_count:
-            # 프로젝트가 성공적으로 삭제된 경우
-            return {"message": "Project successfully deleted"}
-        else:
-            # 프로젝트가 없는 경우 404 에러 반환
-            raise HTTPException(status_code=404, detail="Project not found")
-    except Exception as e:
-        # 예외 처리
-        raise HTTPException(status_code=500, detail=str(e))
+    project = collection.find_one({"_id": ObjectId(project_id)})
+    if not project:
+        raise HTTPException(status_code=404, detail="Project not found")
+
+    project_name = project.get("project_name")
+
+    # 1. 넘겨줄 매개변수 틀 작성
+    parameters = {
+        'type': 'DELETE',
+        'project_name': project_name,
+        'project_id': project_id
+    }
+
+    # 2. 젠킨스 Job에 POST 요청 보내서 Job 실행하기
+    response = requests.post(
+        jenkins_url, 
+        data=parameters, 
+        headers=header, 
+        auth=HTTPBasicAuth(jenkins_user, jenkins_token)
+    )
+
+    # 3. 응답 확인
+    if response.status_code != 201:
+        raise HTTPException(status_code=500, detail="Failed to trigger Jenkins job")
+
+    # 4. 데이터베이스에서 프로젝트 삭제 여부 확인
+    max_wait_time = 60  # 최대 5분 대기
+    wait_interval = 3   # 10초 간격으로 확인
+
+    elapsed_time = 0
+    while elapsed_time < max_wait_time:
+        project = collection.find_one({"_id": ObjectId(project_id)})
+        if not project:
+            return {"message": "Project deleted successfully"}
+        time.sleep(wait_interval)
+        elapsed_time += wait_interval
+
+    raise HTTPException(status_code=500, detail="Timed out waiting for project deletion")
