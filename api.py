@@ -33,6 +33,7 @@ app.add_middleware(
     CORSMiddleware,
     # 허용하는 접속 도메인 작성
     allow_origins=[
+        "http://localhost:5173",
         "http://cloudcrew.site",
         "https://cloudcrew.site",
         "http://www.cloudcrew.site",
