@@ -21,7 +21,7 @@ bucket_name = "cc-helm-templates"
 tz = pytz.timezone('Asia/Seoul') # 모든 리눅스의 기본 time은 미국 혹은 영국 시간
 
 # 젠킨스 서버 데이터 => Configmap, Secret 예정
-jenkins_url = "http://10.0.1.85:8080/job/CloudCrew-JOB/buildWithParameters"
+jenkins_url = "http://10.0.1.85:8080/job/localTest/buildWithParameters"
 jenkins_token = "1151c1c51cd9cdb1d5d8fc1213e1325c3e"
 jenkins_user = "admin"
 header = {'Content-Type': 'application/x-www-form-urlencoded'}
@@ -33,6 +33,7 @@ app.add_middleware(
     CORSMiddleware,
     # 허용하는 접속 도메인 작성
     allow_origins=[
+        "http://localhost:5173",
         "http://cloudcrew.site",
         "https://cloudcrew.site",
         "http://www.cloudcrew.site",
@@ -52,9 +53,13 @@ async def root():
 @app.get("/api/v1/projects", response_model=List[str])
 async def get_projects():
     try:
+        print("Fetching project list...")
         projects = collection.find().sort("day", -1)
-        return [str(project['_id']) for project in projects]
+        project_ids = [str(project['_id']) for project in projects]
+        print(f"Found projects: {project_ids}")
+        return project_ids
     except Exception as e:
+        print(f"Error fetching project list: {e}")
         raise HTTPException(status_code=500, detail=str(e))
 
 # [POST] SB 프로젝트 생성
@@ -106,7 +111,10 @@ async def new_project(
         )
         
         if response.status_code == 201:
-            pass
+            print('Job triggered successfully.')
+        else:
+            print(f'Failed to trigger job: {response.status_code}')
+            print(response.text)
 
         end_time = datetime.now() + timedelta(seconds=60)  # 타임아웃 설정
         while datetime.now() < end_time:
@@ -118,29 +126,41 @@ async def new_project(
         raise HTTPException(status_code=408, detail="Request Timeout: Jenkins job did not finish in time.")
     
     except NoCredentialsError:
+        print("AWS credentials not available")
         raise HTTPException(status_code=403, detail="AWS credentials not available")
     except PartialCredentialsError:
+        print("Incomplete AWS credentials")
         raise HTTPException(status_code=403, detail="Incomplete AWS credentials")
     except BotoCoreError as e:
+        print(f"AWS error: {e}")
         raise HTTPException(status_code=500, detail=f"AWS error: {str(e)}")
     except Exception as e:
+        print(f"An error occurred: {e}")
         raise HTTPException(status_code=500, detail=str(e))
 
 # [GET] 단일 프로젝트 조회
 @app.get("/api/v1/projects/{project_id}", response_model=dict)
 async def get_project(project_id: str):
     try:
+        print(f"Received request for project_id: {project_id}")
+
         max_wait_time = 30
         check_interval = 2
 
         elapsed_time = 0
         while elapsed_time < max_wait_time:
+            print(f"Checking for project in database... Elapsed time: {elapsed_time}s")
+
             project = collection.find_one({"_id": ObjectId(project_id)})
             if project:
+                print("Project found in database")
+
                 meta_data = project.get("meta_data", {})
                 required_keys = {"helm_name", "last_deployed", "namespace", "status", "revision", "chart", "app_version"}
 
                 if meta_data and required_keys.issubset(meta_data.keys()):
+                    print("Meta_data is fully populated")
+
                     project_data = {
                         "project_name": project["project_name"],
                         "end_point": project.get("end_point", "NULL"),
@@ -149,13 +169,17 @@ async def get_project(project_id: str):
                     }
                     return project_data
                 else:
+                    print("Meta_data is not fully populated, waiting...")
                     await asyncio.sleep(check_interval)
                     elapsed_time += check_interval
             else:
+                print("Project not found, raising 404 error")
                 raise HTTPException(status_code=404, detail="Project not found")
 
+        print("Max wait time exceeded, meta_data is not fully populated")
         raise HTTPException(status_code=202, detail="Meta_data is not fully populated yet")
     except Exception as e:
+        print(f"An error occurred: {e}")
         raise HTTPException(status_code=500, detail=str(e))
 
 # [DELETE] 프로젝트 삭제
@@ -164,6 +188,7 @@ async def delete_project(project_id: str):
     try:
         project = collection.find_one({"_id": ObjectId(project_id)})
         if not project:
+            print(f"Project not found for deletion: {project_id}")
             raise HTTPException(status_code=404, detail="Project not found")
 
         project_name = project.get("project_name")
@@ -182,6 +207,7 @@ async def delete_project(project_id: str):
         )
 
         if response.status_code != 201:
+            print(f"Failed to trigger Jenkins job for deletion: {response.status_code}")
             raise HTTPException(status_code=500, detail="Failed to trigger Jenkins job")
 
         max_wait_time = 60
@@ -191,15 +217,18 @@ async def delete_project(project_id: str):
         while elapsed_time < max_wait_time:
             project = collection.find_one({"_id": ObjectId(project_id)})
             if not project:
+                print(f"Project deleted successfully: {project_id}")
                 return {"message": "Project deleted successfully"}
             await asyncio.sleep(wait_interval)
             elapsed_time += wait_interval
 
+        print("Timed out waiting for project deletion")
         raise HTTPException(status_code=500, detail="Timed out waiting for project deletion")
     except Exception as e:
+        print(f"An error occurred during deletion: {e}")
         raise HTTPException(status_code=500, detail=str(e))
 
-# [PUT] 프로젝트 수정하기
+# [PUT] 프로젝트 수정
 @app.put("/api/v1/projects/{project_id}")
 async def update_project(
     project_id: str, 

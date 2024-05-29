@@ -1,6 +1,7 @@
 .dockerignore
 .git
+.github
 __pycache__
 Dockerfile
 README.md
-k8s
+debug.py
