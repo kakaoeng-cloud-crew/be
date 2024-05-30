@@ -108,12 +108,12 @@ async def new_project(
         if response.status_code == 201:
             pass
 
-        end_time = datetime.now() + timedelta(seconds=60)  # 타임아웃 설정
+        end_time = datetime.now() + timedelta(seconds=30)  # 타임아웃 설정
         while datetime.now() < end_time:
             doc = collection.find_one({"_id": ObjectId(project_id)})
             if doc['end_point'] != "NULL":
                 return JSONResponse(content={"project_id": project_id}, status_code=201)
-            await asyncio.sleep(2)  # 2초 후 다시 확인
+            await asyncio.sleep(1)  # 1초 후 다시 확인
         
         raise HTTPException(status_code=408, detail="Request Timeout: Jenkins job did not finish in time.")
     
@@ -130,8 +130,8 @@ async def new_project(
 @app.get("/api/v1/projects/{project_id}", response_model=dict)
 async def get_project(project_id: str):
     try:
-        max_wait_time = 30
-        check_interval = 2
+        max_wait_time = 30 # 타임아웃 30초
+        check_interval = 1 # 1초 마다 확인
 
         elapsed_time = 0
         while elapsed_time < max_wait_time:
@@ -184,8 +184,8 @@ async def delete_project(project_id: str):
         if response.status_code != 201:
             raise HTTPException(status_code=500, detail="Failed to trigger Jenkins job")
 
-        max_wait_time = 60
-        wait_interval = 2
+        max_wait_time = 30 # 타임아웃 30초
+        wait_interval = 1 # 1초마다 체크
 
         elapsed_time = 0
         while elapsed_time < max_wait_time:
@@ -248,7 +248,7 @@ async def update_project(
         
         # 업데이트 완료 체크하기
         max_wait_time = 30 # 최대 시간
-        wait_interval = 2 # 2초 마다 확인
+        wait_interval = 1 # 2초 마다 확인
 
         elapsed_time = 0 # 처음 시간
         while elapsed_time < max_wait_time:
