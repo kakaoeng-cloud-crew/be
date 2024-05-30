@@ -130,8 +130,8 @@ async def new_project(
 @app.get("/api/v1/projects/{project_id}", response_model=dict)
 async def get_project(project_id: str):
     try:
-        max_wait_time = 30 # 타임아웃 30초
-        check_interval = 1 # 1초 마다 확인
+        max_wait_time = 60 # 최대 시간
+        check_interval = 2 # 확인 주기
 
         elapsed_time = 0
         while elapsed_time < max_wait_time:
@@ -184,8 +184,8 @@ async def delete_project(project_id: str):
         if response.status_code != 201:
             raise HTTPException(status_code=500, detail="Failed to trigger Jenkins job")
 
-        max_wait_time = 30 # 타임아웃 30초
-        wait_interval = 1 # 1초마다 체크
+        max_wait_time = 60 # 최대 시간
+        wait_interval = 2 # 확인 주기
 
         elapsed_time = 0
         while elapsed_time < max_wait_time:
@@ -247,8 +247,8 @@ async def update_project(
             raise HTTPException(status_code=500, detail="Failed to trigger Jenkins job")
         
         # 업데이트 완료 체크하기
-        max_wait_time = 30 # 최대 시간
-        wait_interval = 1 # 2초 마다 확인
+        max_wait_time = 60 # 최대 시간
+        wait_interval = 2 # 확인 주기
 
         elapsed_time = 0 # 처음 시간
         while elapsed_time < max_wait_time:
